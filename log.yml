@@ -1,0 +1,48 @@
+#	Ldate(1) = 1 << iota            the date in the local time zone: 2009/01/23
+# Ltime(2)                        the time in the local time zone: 01:23:23
+#	Lmicroseconds(4)                microsecond resolution: 01:23:23.123123.  assumes Ltime.
+#	Llongfile(8)                    full file name and line number: /a/b/c/d.go:23
+#	Lshortfile(16)                  final file name element and line number: d.go:23. overrides Llongfile
+#	LUTC(32)                        if Ldate or Ltime is set, use UTC rather than the local time zone
+#	Lmsgprefix(64)                  move the "prefix" from the beginning of the line to before the message
+#	LstdFlags(3) = Ldate | Ltime    initial values for the standard logger
+console: false
+file_path: logs
+file_name:
+info: 3
+error: 3 | 16
+debug: 1 | 4 | 8
+# Указываем настройки для подключения к стороннему сервису и передачи данных об ошибке
+# api - Опциональное поле
+# url - маршрут
+# method - это метод запроса
+# timeout - время после которого будет завершен запрос, если он не будет отвечен
+# template - шаблон который будет подставляться в body в переменную %s
+# Возможные переенные: %name - имя приложения, %version - версия приложения, %host - имя хоста, %system - операуионная система
+# %time - время возникновения, текущее время, %message - сообщение об ошибке, %prefix - префикс сообщения, пример - ERROR
+# body - тело запроса, указать по шаблону JSON формата, %s - сюда подставляется message
+# content_type - заголовок, который определить каким форматом отправлять тело запроса
+# basic_auth - базовая авторизация запроса
+# proxy - если нужно отправить запрос через прокси
+# headers - добавить дополнительные заголовки к запросу, указывать как массив с полями - name, value
+api:
+  url: http://localhost:5050/callTelegram?eventName=billing-portal
+  method: POST
+  timeout: 30
+  template: '%prefix\n%name %version\nHost: %host\nOS: %system\n\n%time\n%message'
+  body: '{"message": %template}'
+  content_type: application/json
+  basic_auth:
+  proxy:
+  headers:
+# Ротация файлов
+# size - размер файла после которого нужно перемещать файл
+# format - имя перемещаемого файла %name - имя основного файла, %time - время переименования
+# path - путь куда переместить файл, если путь пустой, то оставляем файл на месте
+rotation:
+  size: 10
+  format: '%name_%time'
+  path:
+
+
+

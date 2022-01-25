@@ -1,0 +1,5 @@
+*.exe
+.idea
+logs
+example/file/logs
+*.log

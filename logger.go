@@ -5,6 +5,7 @@ import (
 	"fmt"
 	info "github.com/egovorukhin/egoappinfo"
 	"github.com/egovorukhin/egoconf"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -143,11 +144,19 @@ func (l *Logger) print(prefix, filename string /*callDepth int,*/, sending bool,
 	// Отправка в стороннюю систему
 	if l.config.Api != nil && sending {
 		go func() {
+			url := l.config.Api.Url
 			resp, err := l.config.Api.send(prefix, m)
 			if err != nil {
-				log.Println(err)
+				l.print(ERROR, "", false, err)
+				return
 			}
-			log.Printf("Response: %s\n", resp)
+			defer resp.Body.Close()
+			content, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				l.print(ERROR, "", false, err)
+				return
+			}
+			l.print(INFO, "", false, fmt.Sprintf("Url: %s, StatusCode: %d, Content: '%s'", url, resp.StatusCode, content))
 		}()
 	}
 
@@ -190,8 +199,8 @@ func (l *Logger) Flags(prefix string) {
 }
 
 // Info Используем шаблоны в конфиг файле для каждого из префиксов
-func Info(sending bool, message interface{}, v ...interface{}) {
-	logger.print(INFO, "", sending, message, v...)
+func Info(message interface{}, v ...interface{}) {
+	logger.print(INFO, "", false, message, v...)
 }
 
 // InfoFn Используем шаблоны в конфиг файле для каждого из префиксов
@@ -200,8 +209,8 @@ func InfoFn(filename string, sending bool, message interface{}, v ...interface{}
 }
 
 // Error Префикс
-func Error(sending bool, message interface{}, v ...interface{}) {
-	logger.print(ERROR, "", sending, message, v...)
+func Error(message interface{}, v ...interface{}) {
+	logger.print(ERROR, "", false, message, v...)
 }
 
 // ErrorFn Используем шаблоны в конфиг файле для каждого из префиксов
@@ -210,11 +219,26 @@ func ErrorFn(filename string, sending bool, message interface{}, v ...interface{
 }
 
 // Debug Префикс
-func Debug(sending bool, message interface{}, v ...interface{}) {
-	logger.print(DEBUG, "", sending, message, v...)
+func Debug(message interface{}, v ...interface{}) {
+	logger.print(DEBUG, "", false, message, v...)
 }
 
 // DebugFn Используем шаблоны в конфиг файле для каждого из префиксов
 func DebugFn(filename string, sending bool, message interface{}, v ...interface{}) {
 	logger.print(DEBUG, filename, sending, message, v...)
+}
+
+// InfoSend Отправка сообщения стороннему сервису
+func InfoSend(message interface{}, v ...interface{}) {
+	logger.print(INFO, "", true, message, v...)
+}
+
+// ErrorSend Отправка сообщения стороннему сервису
+func ErrorSend(message interface{}, v ...interface{}) {
+	logger.print(ERROR, "", true, message, v...)
+}
+
+// DebugSend Отправка сообщения стороннему сервису
+func DebugSend(message interface{}, v ...interface{}) {
+	logger.print(ERROR, "", true, message, v...)
 }

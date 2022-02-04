@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/egovorukhin/egolog"
 	"log"
+	"time"
 )
 
 const app = "app"
@@ -16,11 +17,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	egolog.Info(true, "Старт приложения")
-	egolog.Error(true, errors.New("Какая то ошибка"))
+	egolog.Info("Старт приложения")
+	egolog.Error(errors.New("Какая то ошибка"))
+
+	egolog.InfoSend("Старт приложения 1")
+	egolog.ErrorSend("Какая то ошибка 1")
 
 	egolog.ErrorFn(app, true, "Ошибка: %v %s", "Какая то ошибка", "Еще что то")
 	egolog.DebugFn(app, false, "Какая то ошибка")
+
+	time.Sleep(time.Second * 10)
 
 	egolog.Info(true, "Остановка приложения")
 

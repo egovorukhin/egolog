@@ -2,10 +2,9 @@ package egolog
 
 import (
 	"encoding/json"
-	"fmt"
 	info "github.com/egovorukhin/egoappinfo"
 	"github.com/egovorukhin/egorest"
-	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -29,12 +28,12 @@ type BasicAuth struct {
 }
 
 // Отправляем данные по ошибки в любую систему используя api
-func (a *Api) send(prefix, message string) (string, error) {
+func (a *Api) send(prefix, message string) (resp *http.Response, err error) {
 
 	// Инициализация клиента
 	client, err := egorest.NewClientByUri(a.Url)
 	if err != nil {
-		return "", err
+		return
 	}
 
 	// Установка таймаута
@@ -51,7 +50,6 @@ func (a *Api) send(prefix, message string) (string, error) {
 	req := egorest.NewRequest(a.Method, "")
 	// Сериализация тела запроса
 	if a.Body != "" {
-
 		// Готовим шаблон
 		message = strings.Trim(message, "\n")
 		template := message
@@ -70,7 +68,7 @@ func (a *Api) send(prefix, message string) (string, error) {
 		b := strings.ReplaceAll(a.Body, "%template", template)
 		err = json.Unmarshal([]byte(b), &body)
 		if err != nil {
-			return "", err
+			return
 		}
 
 		switch egorest.ContentType(a.ContentType) {
@@ -86,20 +84,10 @@ func (a *Api) send(prefix, message string) (string, error) {
 	req.SetHeader(a.Headers...)
 
 	// Отправка запроса
-	resp, err := client.Send(req)
+	resp, err = client.Send(req)
 	if err != nil {
-		return "", err
+		return
 	}
 
-	// Проверка на корректность ответ
-	if resp != nil {
-		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("%s - %s", resp.Status, b), nil
-	}
-
-	return "empty", nil
+	return resp, nil
 }

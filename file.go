@@ -2,6 +2,7 @@ package egolog
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,22 +14,22 @@ import (
 func (l *Logger) save(filename string) error {
 
 	// Возвращаем путь к директории с логами
-	if _, err := os.Stat(l.config.DirPath); os.IsNotExist(err) {
-		err = os.MkdirAll(l.config.DirPath, 0777)
+	if _, err := os.Stat(l.DirPath); os.IsNotExist(err) {
+		err = os.MkdirAll(l.DirPath, 0777)
 		if err != nil {
 			return err
 		}
 	}
 
 	if filename == "" {
-		filename = l.config.FileName
+		filename = l.FileName
 	}
 
 	// Формируем полный путь к файлу логов
-	fullFileName := filepath.Join(l.config.DirPath, filename+".log")
+	fullPath := filepath.Join(l.DirPath, filename+".log")
 
 	// Проверяем путь на корректность
-	info, err := os.Stat(fullFileName)
+	info, err := os.Stat(fullPath)
 	if !os.IsNotExist(err) {
 
 		if info == nil {
@@ -36,23 +37,22 @@ func (l *Logger) save(filename string) error {
 		}
 
 		// Проверяем размер файла и удаляем если превышает установленный размер
-		if l.config.Rotation != nil /*&& l.config.Rotation.Count > 0*/ && info.Size() > int64(l.config.Rotation.Size)*1024*1024 {
-			path := l.config.DirPath
-			if l.config.Rotation.Path != "" {
-				path = l.config.Rotation.Path
+		if l.Rotation != nil && info.Size() > int64(l.Rotation.Size)*1024 {
+			path := l.DirPath
+			if l.Rotation.Path != "" {
+				path = l.Rotation.Path
 			}
-			format := strings.ReplaceAll(l.config.Rotation.Format, "%name", filename)
+			format := strings.ReplaceAll(l.Rotation.Format, "%name", filename)
 			format = strings.ReplaceAll(format, "%time", time.Now().Format("2006-01-02T15:04:05"))
-			err = os.Rename(fullFileName, filepath.Join(path, format+".log"))
-			//err = os.Remove(fullFileName)
+			err = os.Rename(fullPath, filepath.Join(path, format+".log"))
+			//err = os.Remove(fullPath)
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	// Используем mutex за нормальную конкуренцию за память
-	go l.write(fullFileName)
+	l.write(fullPath)
 
 	return nil
 }
@@ -60,13 +60,15 @@ func (l *Logger) save(filename string) error {
 // Запись в файл
 func (l *Logger) write(path string) {
 
+	fmt.Println(path)
 	// Открываем файл и раздаем права
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
-	defer file.Close()
 	if err != nil {
 		log.Println(err)
 		return
 	}
+	defer file.Close()
+	fmt.Println(file.Name())
 
 	// Пишем в файл данные
 	_, err = file.Write(l.buf.Bytes())

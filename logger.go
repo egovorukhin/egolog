@@ -3,42 +3,39 @@ package egolog
 import (
 	"bytes"
 	"fmt"
-	info "github.com/egovorukhin/egoappinfo"
-	"github.com/egovorukhin/egoconf"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 )
 
 type Logger struct {
-	//fileName string
-	buf    bytes.Buffer
-	config Config
+	buf      bytes.Buffer
+	callback Handler
+	Config
 	*log.Logger
 }
 
 type Config struct {
-	Console  bool   `yaml:"console" json:"console" xml:"Console"`
-	DirPath  string `yaml:"file_path" json:"dir_path" xml:"DirPath"`
-	FileName string `yaml:"file_name" json:"file_name" xml:"FileName"`
-	//FileSize int    `yaml:"file_size" json:"file_size" xml:"FileSize"`
-	Info     Flags     `yaml:"info" json:"info" xml:"Info"`
-	Error    Flags     `yaml:"error" json:"error" xml:"Error"`
-	Debug    Flags     `yaml:"debug" json:"debug" xml:"Debug"`
-	Api      *Api      `yaml:"api,omitempty" json:"api,omitempty" xml:"Api,omitempty"`
-	Rotation *Rotation `yaml:"rotation,omitempty" json:"rotation,omitempty" xml:"Rotation,omitempty"`
+	DirPath   string
+	FileName  string
+	CallDepth int
+	Info      Flags
+	Error     Flags
+	Debug     Flags
+	Rotation  *Rotation
 }
 
 type Rotation struct {
-	Size   int    `yaml:"size" json:"size" xml:"Size"`
-	Format string `yaml:"format" json:"format" xml:"Format"`
-	Path   string `yaml:"path,omitempty" json:"path,omitempty" xml:"Path,omitempty"`
-	//Count int `yaml:"count" json:"count" xml:"count"`
+	Size   int
+	Format string
+	Path   string
 }
+
+type Handler func(prefix, message string)
 
 type Flags string
 
@@ -50,66 +47,57 @@ const (
 
 var logger *Logger
 
-func InitLogger(configPath string, app *info.Application) error {
+func InitLogger(cfg Config, callback ...Handler) error {
 
-	if app == nil {
-		// Инициализируем структуру Application
-		app = info.New()
-	}
-
-	// Если путь не абсолютный, то подставляем путь относительно приложения
-	if !filepath.IsAbs(configPath) {
-		configPath = filepath.Join(app.Executable.Dir, configPath)
-	}
-
-	cfg := Config{}
-	err := egoconf.Load(configPath, &cfg)
+	path, err := os.Executable()
 	if err != nil {
 		return err
 	}
 
-	// Устанавливаем размер файла
-	/*if cfg.FileSize == 0 {
-		cfg.FileSize = 10
-	}*/
+	dirPath := filepath.Dir(path)
+	fileName := strings.ReplaceAll(filepath.Base(path), " ", "_")
 
 	// Устанавливаем путь по умолчанию
 	if cfg.DirPath == "" {
-		cfg.DirPath = app.Executable.Dir
+		switch strings.ToLower(runtime.GOOS) {
+		case "windows":
+			cfg.DirPath = filepath.Join(dirPath, "logs")
+			break
+		case "linux":
+			cfg.DirPath = filepath.Join("/var/log/", fileName)
+		}
 	} else {
 		if !filepath.IsAbs(cfg.DirPath) {
-			cfg.DirPath = filepath.Join(app.Executable.Dir, cfg.DirPath)
+			cfg.DirPath = filepath.Join(dirPath, cfg.DirPath)
 		}
 	}
 
 	// Если не указано имя основного файла, то даем имя приложения
 	if cfg.FileName == "" {
-		cfg.FileName = strings.ToLower(app.Name) //strings.ReplaceAll(filepath.Base(app.Executable.File), filepath.Ext(app.Executable.File), "")
+		cfg.FileName = strings.ToLower(fileName)
 	}
 
-	if cfg.Api != nil {
-		cfg.Api.App = app
+	if cfg.CallDepth == 0 {
+		cfg.CallDepth = 3
 	}
 
 	logger = &Logger{
-		config: cfg,
+		Config: cfg,
 		Logger: new(log.Logger),
 	}
 
-	// Устанавливаем Writer
-	if cfg.Console {
-		// вывод в консоль
-		logger.SetOutput(os.Stdout)
-	} else {
-		// Буфер для записи в файл
-		logger.SetOutput(&logger.buf)
+	if callback != nil {
+		logger.callback = callback[0]
 	}
+
+	// Устанавливаем Writer
+	logger.SetOutput(&logger.buf)
 
 	return nil
 }
 
 // Выводим данные
-func (l *Logger) print(prefix, filename string /*callDepth int,*/, sending bool, message interface{}, v ...interface{}) {
+func (l *Logger) print(prefix, filename string, isHandler bool, message interface{}, v ...interface{}) {
 
 	// Если сообщение нет, то выходим
 	if message == nil {
@@ -136,36 +124,22 @@ func (l *Logger) print(prefix, filename string /*callDepth int,*/, sending bool,
 	}
 
 	// CallDepth - глубина стека, количество кадров стека для вызывающего файла.
-	err := l.Output(3, m)
+	err := l.Output(l.CallDepth, m)
 	if err != nil {
 		log.Println(err)
 	}
 
-	// Отправка в стороннюю систему
-	if l.config.Api != nil && sending {
-		go func() {
-			url := l.config.Api.Url
-			resp, err := l.config.Api.send(prefix, m)
-			if err != nil {
-				l.print(ERROR, "", false, err)
-				return
-			}
-			defer resp.Body.Close()
-			content, err := ioutil.ReadAll(resp.Body)
-			if err != nil {
-				l.print(ERROR, "", false, err)
-				return
-			}
-			l.print(INFO, "", false, fmt.Sprintf("Url: %s, StatusCode: %d, Content: '%s'", url, resp.StatusCode, content))
-		}()
+	// Вывод в консоль
+	log.Printf("%s: %s", prefix, m)
+	// Сохранение в файл
+	err = logger.save(filename)
+	if err != nil {
+		log.Println(err)
 	}
 
-	// Сохранение в файл
-	if !l.config.Console {
-		err := logger.save(filename)
-		if err != nil {
-			log.Println(err)
-		}
+	// Выполнение обработчика
+	if isHandler && l.callback != nil {
+		go l.callback(prefix, m)
 	}
 }
 
@@ -175,13 +149,13 @@ func (l *Logger) Flags(prefix string) {
 	s := "3"
 	switch prefix {
 	case INFO:
-		s = string(l.config.Info)
+		s = string(l.Info)
 		break
 	case ERROR:
-		s = string(l.config.Error)
+		s = string(l.Error)
 		break
 	case DEBUG:
-		s = string(l.config.Debug)
+		s = string(l.Debug)
 		break
 	}
 
@@ -203,19 +177,9 @@ func Info(message interface{}, v ...interface{}) {
 	logger.print(INFO, "", false, message, v...)
 }
 
-// InfoFn Используем шаблоны в конфиг файле для каждого из префиксов
-func InfoFn(filename string, sending bool, message interface{}, v ...interface{}) {
-	logger.print(INFO, filename, sending, message, v...)
-}
-
 // Error Префикс
 func Error(message interface{}, v ...interface{}) {
 	logger.print(ERROR, "", false, message, v...)
-}
-
-// ErrorFn Используем шаблоны в конфиг файле для каждого из префиксов
-func ErrorFn(filename string, sending bool, message interface{}, v ...interface{}) {
-	logger.print(ERROR, filename, sending, message, v...)
 }
 
 // Debug Префикс
@@ -223,22 +187,47 @@ func Debug(message interface{}, v ...interface{}) {
 	logger.print(DEBUG, "", false, message, v...)
 }
 
-// DebugFn Используем шаблоны в конфиг файле для каждого из префиксов
-func DebugFn(filename string, sending bool, message interface{}, v ...interface{}) {
-	logger.print(DEBUG, filename, sending, message, v...)
+// Infofn Сохранение в файл с указанием имени файла
+func Infofn(filename string, message interface{}, v ...interface{}) {
+	logger.print(INFO, filename, false, message, v...)
 }
 
-// InfoSend Отправка сообщения стороннему сервису
-func InfoSend(message interface{}, v ...interface{}) {
+// Errorfn Используем шаблоны в конфиг файле для каждого из префиксов
+func Errorfn(filename string, message interface{}, v ...interface{}) {
+	logger.print(ERROR, filename, false, message, v...)
+}
+
+// Debugfn Используем шаблоны в конфиг файле для каждого из префиксов
+func Debugfn(filename string, message interface{}, v ...interface{}) {
+	logger.print(DEBUG, filename, false, message, v...)
+}
+
+// Infocb вызов обработчика
+func Infocb(message interface{}, v ...interface{}) {
 	logger.print(INFO, "", true, message, v...)
 }
 
-// ErrorSend Отправка сообщения стороннему сервису
-func ErrorSend(message interface{}, v ...interface{}) {
+// Errorcb вызов обработчика
+func Errorcb(message interface{}, v ...interface{}) {
 	logger.print(ERROR, "", true, message, v...)
 }
 
-// DebugSend Отправка сообщения стороннему сервису
-func DebugSend(message interface{}, v ...interface{}) {
-	logger.print(ERROR, "", true, message, v...)
+// Debugcb вызов обработчика
+func Debugcb(message interface{}, v ...interface{}) {
+	logger.print(DEBUG, "", true, message, v...)
+}
+
+// Infofncb вызов обработчика
+func Infofncb(filename string, message interface{}, v ...interface{}) {
+	logger.print(INFO, filename, true, message, v...)
+}
+
+// Errorfncb вызов обработчика
+func Errorfncb(filename string, message interface{}, v ...interface{}) {
+	logger.print(ERROR, filename, true, message, v...)
+}
+
+// Debugfncb вызов обработчика
+func Debugfncb(filename string, message interface{}, v ...interface{}) {
+	logger.print(DEBUG, filename, true, message, v...)
 }

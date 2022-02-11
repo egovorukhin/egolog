@@ -2,7 +2,6 @@ package egolog
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -60,7 +59,6 @@ func (l *Logger) save(filename string) error {
 // Запись в файл
 func (l *Logger) write(path string) {
 
-	fmt.Println(path)
 	// Открываем файл и раздаем права
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
@@ -68,7 +66,6 @@ func (l *Logger) write(path string) {
 		return
 	}
 	defer file.Close()
-	fmt.Println(file.Name())
 
 	// Пишем в файл данные
 	_, err = file.Write(l.buf.Bytes())

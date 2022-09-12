@@ -22,8 +22,10 @@ func Test(t *testing.T) {
 		},
 	}
 
-	callback := func(prefix, message string) {
-		fmt.Printf("Повтор - %s: %s\n", prefix, message)
+	callback := func(filename, prefix, m string, message interface{}, v ...interface{}) {
+		fmt.Printf("name: %s, prefix: %s, message: %s", filename, prefix, m)
+		m = fmt.Sprintf(message.(string), v...)
+		fmt.Printf("name: %s, prefix: %s, message: %s", filename, prefix, m)
 	}
 
 	// Инициализируем Logger

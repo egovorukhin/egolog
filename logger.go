@@ -2,6 +2,7 @@ package egolog
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -10,11 +11,14 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Logger struct {
-	buf      bytes.Buffer
-	callback Handler
+	buf bytes.Buffer
+	//callback Handler
+	callback Callback
+	FullPath string
 	Config
 	*log.Logger
 }
@@ -35,7 +39,8 @@ type Rotation struct {
 	Path   string
 }
 
-type Handler func(prefix, message string)
+// type Handler func(prefix, message string)
+type Callback func(filename, prefix, m string, message interface{}, v ...interface{})
 
 type Flags string
 
@@ -47,7 +52,7 @@ const (
 
 var logger *Logger
 
-func InitLogger(cfg Config, callback ...Handler) error {
+func InitLogger(cfg Config, callback ...Callback) error {
 
 	path, err := os.Executable()
 	if err != nil {
@@ -96,6 +101,72 @@ func InitLogger(cfg Config, callback ...Handler) error {
 	return nil
 }
 
+// SetCallback Устанавливаем обработчик для обратной функции, начиная с версии v0.2.1
+func SetCallback(callback Callback) {
+	logger.callback = callback
+}
+
+func (l *Logger) createPathAndRotation(filename string) error {
+
+	// Возвращаем путь к директории с логами
+	if _, err := os.Stat(l.DirPath); os.IsNotExist(err) {
+		err = os.MkdirAll(l.DirPath, 0777)
+		if err != nil {
+			return err
+		}
+	}
+
+	if filename == "" {
+		filename = l.FileName
+	}
+
+	// Формируем полный путь к файлу логов
+	l.FullPath = filepath.Join(l.DirPath, filename+".log")
+
+	// Проверяем путь на корректность
+	info, err := os.Stat(l.FullPath)
+	if !os.IsNotExist(err) {
+
+		if info == nil {
+			return errors.New("Неверный формат пути!")
+		}
+
+		// Проверяем размер файла и удаляем если превышает установленный размер
+		if l.Rotation != nil && info.Size() > int64(l.Rotation.Size)*1024 {
+			path := l.DirPath
+			if l.Rotation.Path != "" {
+				path = l.Rotation.Path
+			}
+			format := strings.ReplaceAll(l.Rotation.Format, "%name", filename)
+			format = strings.ReplaceAll(format, "%time", time.Now().Format("2006-01-02T15:04:05"))
+			err = os.Rename(l.FullPath, filepath.Join(path, format+".log"))
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (l *Logger) Write(data []byte) (int, error) {
+
+	// Открываем файл и раздаем права
+	file, err := os.OpenFile(l.FullPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	// Пишем в файл данные
+	return file.Write(data)
+	// Очистка буфера, чтобы не писать повторяющиеся данные
+	//defer l.buf.Reset()
+	/*if err != nil {
+		log.Println(err)
+	}*/
+}
+
 // Выводим данные
 func (l *Logger) print(prefix, filename string, isHandler bool, message interface{}, v ...interface{}) {
 
@@ -105,7 +176,7 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 	}
 
 	if l == nil {
-		log.Println("Необходимо инициализировать структуру Logger.  Функция InitLogger()")
+		log.Println("Необходимо инициализировать структуру Logger. Функция InitLogger()")
 		return
 	}
 
@@ -116,7 +187,6 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 	// Если в массиве v есть элементы, то message используем как формат
 	if v != nil {
 		if reflect.ValueOf(message).Kind() == reflect.String {
-			// CallDepth - глубина стека, количество кадров стека для вызывающего файла.
 			m = fmt.Sprintf(message.(string), v...)
 		}
 	} else {
@@ -128,18 +198,18 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 	if err != nil {
 		log.Println(err)
 	}
-
-	// Вывод в консоль
-	log.Printf("%s: %s", prefix, m)
-	// Сохранение в файл
-	err = logger.save(filename)
+	// Устанавливаем путь для файла сохранения
+	err = logger.createPathAndRotation(filename)
 	if err != nil {
 		log.Println(err)
 	}
 
+	// Вывод в консоль
+	log.Printf("%s: %s", prefix, m)
+
 	// Выполнение обработчика
 	if isHandler && l.callback != nil {
-		go l.callback(prefix, m)
+		go l.callback(filename, prefix, m, message, v...)
 	}
 }
 
@@ -150,13 +220,10 @@ func (l *Logger) Flags(prefix string) {
 	switch prefix {
 	case INFO:
 		s = string(l.Info)
-		break
 	case ERROR:
 		s = string(l.Error)
-		break
 	case DEBUG:
 		s = string(l.Debug)
-		break
 	}
 
 	flags := strings.Split(s, "|")

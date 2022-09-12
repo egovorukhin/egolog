@@ -1,7 +1,6 @@
 package egolog
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"log"
@@ -15,7 +14,7 @@ import (
 )
 
 type Logger struct {
-	buf bytes.Buffer
+	//buf bytes.Buffer
 	//callback Handler
 	callback Callback
 	FullPath string
@@ -95,7 +94,7 @@ func InitLogger(cfg Config, callback ...Callback) error {
 	}
 
 	// Устанавливаем Writer
-	logger.SetOutput(&logger.buf)
+	logger.Logger.SetOutput(logger)
 
 	return nil
 }

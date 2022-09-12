@@ -39,15 +39,6 @@ type Rotation struct {
 	Path   string
 }
 
-type InfoLog map[string]interface{}
-
-const (
-	InfoLogPath    = "path"
-	InfoLogName    = "name"
-	InfoLogPrefix  = "prefix"
-	InfoLogMessage = "message"
-)
-
 type Callback func(InfoLog)
 
 type Flags string

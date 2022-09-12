@@ -19,7 +19,7 @@ type Logger struct {
 	callback Callback
 	FullPath string
 	Config
-	*log.Logger
+	logger *log.Logger
 }
 
 type Config struct {
@@ -86,7 +86,7 @@ func InitLogger(cfg Config, callback ...Callback) error {
 
 	logger = &Logger{
 		Config: cfg,
-		Logger: new(log.Logger),
+		logger: new(log.Logger),
 	}
 
 	if callback != nil {
@@ -94,7 +94,7 @@ func InitLogger(cfg Config, callback ...Callback) error {
 	}
 
 	// Устанавливаем Writer
-	logger.Logger.SetOutput(logger)
+	logger.logger.SetOutput(logger)
 
 	return nil
 }
@@ -149,6 +149,9 @@ func (l *Logger) createPathAndRotation(filename string) error {
 
 func (l *Logger) Write(data []byte) (int, error) {
 
+	if l.FullPath == "" {
+		l.FullPath = l.FileName + ".log"
+	}
 	// Открываем файл и раздаем права
 	file, err := os.OpenFile(l.FullPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0666)
 	if err != nil {
@@ -168,8 +171,15 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 		return
 	}
 
+	// Устанавливаем путь для файла сохранения
+	err := logger.createPathAndRotation(filename)
+	if err != nil {
+		l.logger.Println(err)
+		return
+	}
+
 	if l == nil {
-		log.Println("Необходимо инициализировать структуру Logger. Функция InitLogger()")
+		l.logger.Println("Необходимо инициализировать структуру Logger. Функция InitLogger()")
 		return
 	}
 
@@ -187,18 +197,13 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 	}
 
 	// CallDepth - глубина стека, количество кадров стека для вызывающего файла.
-	err := l.Output(l.CallDepth, m)
+	err = l.logger.Output(l.CallDepth, m)
 	if err != nil {
-		log.Println(err)
-	}
-	// Устанавливаем путь для файла сохранения
-	err = logger.createPathAndRotation(filename)
-	if err != nil {
-		log.Println(err)
+		l.logger.Println(err)
 	}
 
 	// Вывод в консоль
-	log.Printf("%s: %s", prefix, m)
+	//l.logger.Printf("%s", m)
 
 	// Выполнение обработчика
 	if isHandler && l.callback != nil {
@@ -214,7 +219,7 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 
 func (l *Logger) Flags(prefix string) {
 
-	l.SetPrefix(prefix + ": ")
+	l.logger.SetPrefix(strings.ToUpper(prefix) + " ")
 	s := "3"
 	switch prefix {
 	case INFO:
@@ -235,7 +240,7 @@ func (l *Logger) Flags(prefix string) {
 		}
 		f = f | i
 	}
-	l.SetFlags(f)
+	l.logger.SetFlags(f)
 }
 
 // Info Используем шаблоны в конфиг файле для каждого из префиксов

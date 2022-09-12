@@ -3,7 +3,6 @@ package egolog
 import (
 	"errors"
 	"fmt"
-	"log"
 	"testing"
 )
 
@@ -29,7 +28,7 @@ func Test(t *testing.T) {
 	// Инициализируем Logger
 	err := InitLogger(cfg, callback)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	Info("Старт приложения")

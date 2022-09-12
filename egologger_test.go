@@ -22,10 +22,8 @@ func Test(t *testing.T) {
 		},
 	}
 
-	callback := func(filename, prefix, m string, message interface{}, v ...interface{}) {
-		fmt.Printf("name: %s, prefix: %s, message: %s", filename, prefix, m)
-		m = fmt.Sprintf(message.(string), v...)
-		fmt.Printf("name: %s, prefix: %s, message: %s", filename, prefix, m)
+	callback := func(infoLog InfoLog) {
+		fmt.Printf("path: %s, name: %s, prefix: %s, message: %s", infoLog["path"], infoLog["name"], infoLog["prefix"], infoLog["message"])
 	}
 
 	// Инициализируем Logger

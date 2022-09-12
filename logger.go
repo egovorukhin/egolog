@@ -39,8 +39,9 @@ type Rotation struct {
 	Path   string
 }
 
-// type Handler func(prefix, message string)
-type Callback func(filename, prefix, m string, message interface{}, v ...interface{})
+type InfoLog map[string]interface{}
+
+type Callback func(InfoLog)
 
 type Flags string
 
@@ -160,11 +161,6 @@ func (l *Logger) Write(data []byte) (int, error) {
 
 	// Пишем в файл данные
 	return file.Write(data)
-	// Очистка буфера, чтобы не писать повторяющиеся данные
-	//defer l.buf.Reset()
-	/*if err != nil {
-		log.Println(err)
-	}*/
 }
 
 // Выводим данные
@@ -209,7 +205,13 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 
 	// Выполнение обработчика
 	if isHandler && l.callback != nil {
-		go l.callback(filename, prefix, m, message, v...)
+		infoLog := InfoLog{
+			"name":    filename,
+			"path":    l.FullPath,
+			"prefix":  prefix,
+			"message": m,
+		}
+		go l.callback(infoLog)
 	}
 }
 

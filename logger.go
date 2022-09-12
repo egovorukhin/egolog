@@ -41,6 +41,13 @@ type Rotation struct {
 
 type InfoLog map[string]interface{}
 
+const (
+	InfoLogPath    = "path"
+	InfoLogName    = "name"
+	InfoLogPrefix  = "prefix"
+	InfoLogMessage = "message"
+)
+
 type Callback func(InfoLog)
 
 type Flags string
@@ -206,10 +213,10 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 	// Выполнение обработчика
 	if isHandler && l.callback != nil {
 		infoLog := InfoLog{
-			"name":    filename,
-			"path":    l.FullPath,
-			"prefix":  prefix,
-			"message": m,
+			InfoLogName:    filename,
+			InfoLogPath:    l.FullPath,
+			InfoLogPrefix:  prefix,
+			InfoLogMessage: m,
 		}
 		go l.callback(infoLog)
 	}

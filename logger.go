@@ -3,6 +3,7 @@ package egolog
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -43,9 +44,9 @@ type Callback func(InfoLog)
 type Flags string
 
 const (
-	INFO  = "Info"
-	ERROR = "Error"
-	DEBUG = "Debug"
+	INFO  = "INFO"
+	ERROR = "ERROR"
+	DEBUG = "DEBUG"
 )
 
 var logger *Logger
@@ -83,6 +84,8 @@ func InitLogger(cfg Config, callback ...Callback) error {
 	if cfg.CallDepth == 0 {
 		cfg.CallDepth = 3
 	}
+
+	io.MultiWriter()
 
 	logger = &Logger{
 		Config: cfg,
@@ -149,6 +152,7 @@ func (l *Logger) createPathAndRotation(filename string) error {
 
 func (l *Logger) Write(data []byte) (int, error) {
 
+	// Пишем в файл
 	if l.FullPath == "" {
 		l.FullPath = l.FileName + ".log"
 	}
@@ -160,7 +164,7 @@ func (l *Logger) Write(data []byte) (int, error) {
 	defer file.Close()
 
 	// Пишем в файл данные
-	return file.Write(data)
+	return io.MultiWriter(os.Stdout, file).Write(data)
 }
 
 // Выводим данные
@@ -219,7 +223,7 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 
 func (l *Logger) Flags(prefix string) {
 
-	l.logger.SetPrefix(strings.ToUpper(prefix) + " ")
+	l.logger.SetPrefix(prefix + " ")
 	s := "3"
 	switch prefix {
 	case INFO:

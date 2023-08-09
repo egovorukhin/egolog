@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -27,6 +26,7 @@ type Config struct {
 	DirPath   string
 	FileName  string
 	CallDepth int
+	Escaped   bool
 	Info      Flags
 	Error     Flags
 	Debug     Flags
@@ -190,18 +190,21 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 	// Устанавливаем флаг
 	logger.Flags(prefix)
 
-	m := ""
+	msg := ""
 	// Если в массиве v есть элементы, то message используем как формат
-	if v != nil {
-		if reflect.ValueOf(message).Kind() == reflect.String {
-			m = fmt.Sprintf(message.(string), v...)
-		}
-	} else {
-		m = fmt.Sprintln(message)
+	switch t := message.(type) {
+	case string:
+		msg = fmt.Sprintf(t, v...)
+	default:
+		msg = fmt.Sprintln(message)
+	}
+
+	if l.Escaped {
+		msg = fmt.Sprintf("%q", msg)
 	}
 
 	// CallDepth - глубина стека, количество кадров стека для вызывающего файла.
-	err = l.logger.Output(l.CallDepth, m)
+	err = l.logger.Output(l.CallDepth, msg)
 	if err != nil {
 		l.logger.Println(err)
 	}
@@ -215,7 +218,7 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 			InfoLogName:    filename,
 			InfoLogPath:    l.FullPath,
 			InfoLogPrefix:  prefix,
-			InfoLogMessage: m,
+			InfoLogMessage: msg,
 		}
 		go l.callback(infoLog)
 	}

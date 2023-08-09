@@ -11,6 +11,7 @@ const app = "app"
 func Test(t *testing.T) {
 
 	cfg := Config{
+		Escaped: true,
 		DirPath: "logs",
 		Info:    "3",
 		Error:   "3 | 16",
@@ -31,8 +32,13 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	s := `-Привет мир!
+-Как дела?
+
+	-Хорошо`
+
 	Info("Старт приложения")
-	Error(errors.New("Какая то ошибка"))
+	Error(errors.New(s))
 
 	Infocb("Старт приложения 1")
 	Errorcb("Какая то ошибка 1")

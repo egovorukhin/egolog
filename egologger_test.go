@@ -2,7 +2,6 @@ package egolog
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 )
 
@@ -10,7 +9,7 @@ const app = "app"
 
 func Test(t *testing.T) {
 
-	cfg := Config{
+	/*cfg := Config{
 		Escaped: true,
 		DirPath: "logs",
 		Info:    "3",
@@ -20,17 +19,17 @@ func Test(t *testing.T) {
 			Size:   10240,
 			Format: "%name_%time",
 		},
-	}
+	}*/
 
-	callback := func(infoLog InfoLog) {
+	/*callback := func(infoLog InfoLog) {
 		fmt.Printf("path: %s, name: %s, prefix: %s, message: %s", infoLog["path"], infoLog["name"], infoLog["prefix"], infoLog["message"])
-	}
+	}*/
 
 	// Инициализируем Logger
-	err := InitLogger(cfg, callback)
+	/*err := InitLogger(cfg, callback)
 	if err != nil {
 		t.Fatal(err)
-	}
+	}*/
 
 	s := `-Привет мир!
 -Как дела?

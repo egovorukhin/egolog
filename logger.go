@@ -14,12 +14,10 @@ import (
 )
 
 type Logger struct {
-	//buf bytes.Buffer
-	//callback Handler
-	callback Callback
-	FullPath string
 	Config
-	logger *log.Logger
+	FullPath string
+	logger   *log.Logger
+	callback Callback
 }
 
 type Config struct {
@@ -50,6 +48,17 @@ const (
 )
 
 var logger *Logger
+
+var DefaultConfig = Config{
+	Escaped: true,
+	Info:    "3",
+	Error:   "3 | 16",
+	Debug:   "1 | 4 | 8",
+	Rotation: &Rotation{
+		Size:   10240,
+		Format: "%name_old",
+	},
+}
 
 func InitLogger(cfg Config, callback ...Callback) error {
 
@@ -182,11 +191,6 @@ func (l *Logger) print(prefix, filename string, isHandler bool, message interfac
 		return
 	}
 
-	if l == nil {
-		l.logger.Println("Необходимо инициализировать структуру Logger. Функция InitLogger()")
-		return
-	}
-
 	// Устанавливаем флаг
 	logger.Flags(prefix)
 
@@ -250,62 +254,70 @@ func (l *Logger) Flags(prefix string) {
 	l.logger.SetFlags(f)
 }
 
+func write(prefix, filename string, isHandler bool, message interface{}, v ...interface{}) {
+	if logger == nil {
+		_ = InitLogger(DefaultConfig, nil)
+		logger.print(INFO, "", false, "Warning! Init Default Logger")
+	}
+	logger.print(prefix, filename, isHandler, message, v...)
+}
+
 // Info Используем шаблоны в конфиг файле для каждого из префиксов
 func Info(message interface{}, v ...interface{}) {
-	logger.print(INFO, "", false, message, v...)
+	write(INFO, "", false, message, v...)
 }
 
 // Error Префикс
 func Error(message interface{}, v ...interface{}) {
-	logger.print(ERROR, "", false, message, v...)
+	write(ERROR, "", false, message, v...)
 }
 
 // Debug Префикс
 func Debug(message interface{}, v ...interface{}) {
-	logger.print(DEBUG, "", false, message, v...)
+	write(DEBUG, "", false, message, v...)
 }
 
 // Infofn Сохранение в файл с указанием имени файла
 func Infofn(filename string, message interface{}, v ...interface{}) {
-	logger.print(INFO, filename, false, message, v...)
+	write(INFO, filename, false, message, v...)
 }
 
 // Errorfn Используем шаблоны в конфиг файле для каждого из префиксов
 func Errorfn(filename string, message interface{}, v ...interface{}) {
-	logger.print(ERROR, filename, false, message, v...)
+	write(ERROR, filename, false, message, v...)
 }
 
 // Debugfn Используем шаблоны в конфиг файле для каждого из префиксов
 func Debugfn(filename string, message interface{}, v ...interface{}) {
-	logger.print(DEBUG, filename, false, message, v...)
+	write(DEBUG, filename, false, message, v...)
 }
 
 // Infocb вызов обработчика
 func Infocb(message interface{}, v ...interface{}) {
-	logger.print(INFO, "", true, message, v...)
+	write(INFO, "", true, message, v...)
 }
 
 // Errorcb вызов обработчика
 func Errorcb(message interface{}, v ...interface{}) {
-	logger.print(ERROR, "", true, message, v...)
+	write(ERROR, "", true, message, v...)
 }
 
 // Debugcb вызов обработчика
 func Debugcb(message interface{}, v ...interface{}) {
-	logger.print(DEBUG, "", true, message, v...)
+	write(DEBUG, "", true, message, v...)
 }
 
 // Infofncb вызов обработчика
 func Infofncb(filename string, message interface{}, v ...interface{}) {
-	logger.print(INFO, filename, true, message, v...)
+	write(INFO, filename, true, message, v...)
 }
 
 // Errorfncb вызов обработчика
 func Errorfncb(filename string, message interface{}, v ...interface{}) {
-	logger.print(ERROR, filename, true, message, v...)
+	write(ERROR, filename, true, message, v...)
 }
 
 // Debugfncb вызов обработчика
 func Debugfncb(filename string, message interface{}, v ...interface{}) {
-	logger.print(DEBUG, filename, true, message, v...)
+	write(DEBUG, filename, true, message, v...)
 }
